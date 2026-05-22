@@ -61,7 +61,7 @@ const PROJECTS = [
 {
   name: 'Voice Retail Assistant',
   tag: 'Embedded systems',
-  blurb: 'Raspberry Pi voice assistant that delivers real-time store and inventory information customers and staff.',
+  blurb: 'Raspberry Pi voice assistant that delivers real-time store and inventory information for customers and staff.',
   stack: ['Python', 'LangChain', 'Pinecone'],
   href: '#'
 },
