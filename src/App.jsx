@@ -6,7 +6,7 @@ import {
 } from './TweaksPanel.jsx';
 
 const TWEAK_DEFAULTS = {
-  "dark": false,
+  "dark": true,
   "dotDensity": 22,
   "rippleIntensity": 1,
   "accent": "sage",
