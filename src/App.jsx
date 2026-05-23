@@ -54,14 +54,14 @@ const PROJECTS = [
 {
   name: 'Poker Equity Engine',
   tag: 'Backend systems',
-  blurb: 'Computes hand equities and win probabilities for 2-9 player scenarios via batched Monte Carlo simulation.',
+  blurb: "Computes win probabilities and hand equities for 2–9 player scenarios in Texas Hold'em via Monte Carlo simulation. 35% faster than the baseline.",
   stack: ['Node.js', 'PostgreSQL', 'AWS'],
-  href: '#'
+  href: 'https://holdemcalculator.vercel.app/'
 },
 {
   name: 'Voice Retail Assistant',
   tag: 'Embedded systems',
-  blurb: 'Raspberry Pi voice assistant that delivers real-time store and inventory information for customers and staff.',
+  blurb: 'Answers natural language inventory and store questions for 200+ daily customers and staff in a local retail store. Built on a Raspberry Pi.',
   stack: ['Python', 'LangChain', 'Pinecone'],
   href: '#'
 },
@@ -168,18 +168,35 @@ function Projects() {
     <section className="section" id="projects">
       <SectionLabel num="02">Selected Projects</SectionLabel>
       <div className="proj-grid">
-        {PROJECTS.map((p, i) =>
-        <Reveal key={i} delay={i % 3 * 80} className="proj-card">
+        {PROJECTS.map((p, i) => {
+          const linkable = p.href && p.href !== '#';
+          const cardProps = linkable ?
+            { as: 'a', href: p.href, target: '_blank', rel: 'noreferrer',
+              'aria-label': `View ${p.name}` } :
+            {};
+          return (
+          <Reveal key={i} delay={i % 3 * 80}
+            className={`proj-card ${linkable ? 'is-linked' : ''}`}
+            {...cardProps}>
             <div className="proj-card-top">
               <div className="proj-tag">{p.tag}</div>
+              {linkable &&
+              <span className="proj-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="2" y1="22" x2="17" y2="7" />
+                  <polyline points="9 7 17 7 17 15" />
+                </svg>
+              </span>
+              }
             </div>
             <div className="proj-name">{p.name}</div>
             <div className="proj-blurb">{p.blurb}</div>
             <div className="proj-stack">
               {p.stack.map((s, j) => <span key={j}>{s}</span>)}
             </div>
-          </Reveal>
-        )}
+          </Reveal>);
+        })}
       </div>
     </section>);
 
