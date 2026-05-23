@@ -52,11 +52,11 @@ const EXPERIENCES = [
 
 const PROJECTS = [
 {
-  name: 'Poker Equity Engine',
+  name: 'Poker Analytics Engine',
   tag: 'Backend systems',
   blurb: "Computes win probabilities and hand equities for 2–9 player scenarios in Texas Hold'em via Monte Carlo simulation. 35% faster than the baseline.",
   stack: ['Node.js', 'PostgreSQL', 'AWS'],
-  href: 'https://holdemcalculator.vercel.app/'
+  href: 'https://holdemanalytics.vercel.app/'
 },
 {
   name: 'Voice Retail Assistant',
