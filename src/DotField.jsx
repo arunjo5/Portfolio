@@ -60,6 +60,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
             vx: 0, vy: 0,
             phase: ((seed >> 16) & 0xff) / 255 * Math.PI * 2,
             heat: 0,
+            act: 0,
           });
         }
       }
@@ -94,7 +95,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
       const dx = x - st.mouse.lastX;
       const dy = y - st.mouse.lastY;
       const moved = Math.hypot(dx, dy);
-      if (now - st.mouse.lastSpawn > 90 && moved > 6) {
+      if (effect === 'ripple' && now - st.mouse.lastSpawn > 90 && moved > 6) {
         st.ripples.push({ x, y, t0: now });
         st.mouse.lastSpawn = now;
         st.mouse.lastX = x;
@@ -112,6 +113,11 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       st.ripples.push({ x: cx, y: cy, t0: performance.now(), strong: true });
+      if (effect === 'bloom') {
+        st.ripples.push({ x: cx, y: cy, t0: performance.now() + 170, strong: true });
+        st.ripples.push({ x: cx, y: cy, t0: performance.now() + 340, strong: true });
+      }
+      if (st.ripples.length > 5) st.ripples.splice(0, st.ripples.length - 5);
 
       const N = 22;
       for (let i = 0; i < N; i++) {
@@ -209,14 +215,34 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
 
       if (effect === 'heatmap' || effect === 'synapse') {
         const decay = Math.exp(-0.6 * dt);
+        const actDecay = Math.exp(-5 * dt);
+        const ripplesActive = effect === 'synapse' && st.ripples.length > 0;
+        const RING_SPEED = 480;
+        const RING_SIGMA = 50;
         for (let i = 0; i < st.dots.length; i++) {
           const d = st.dots[i];
           d.heat *= decay;
+          if (effect === 'synapse') d.act *= actDecay;
           if (mouseLive) {
             const ddx = d.hx - mx, ddy = d.hy - my;
             const dd2 = ddx * ddx + ddy * ddy;
-            const add = Math.exp(-dd2 / (2 * 42 * 42)) * dt * 4.5 * intensity;
+            const add = Math.exp(-dd2 / (2 * 50 * 50)) * dt * 4.5 * intensity;
             d.heat = Math.min(1.4, d.heat + add);
+          }
+          if (ripplesActive) {
+            let ring = 0;
+            for (let j = 0; j < st.ripples.length; j++) {
+              const rp = st.ripples[j];
+              const age = (now - rp.t0) / 1000;
+              if (age < 0) continue;
+              const rdx = d.hx - rp.x, rdy = d.hy - rp.y;
+              const dist = Math.sqrt(rdx * rdx + rdy * rdy);
+              const delta = dist - age * RING_SPEED;
+              const decR = Math.exp(-age * 0.8);
+              const a = decR * Math.exp(-(delta * delta) / (2 * RING_SIGMA * RING_SIGMA));
+              if (a > ring) ring = a;
+            }
+            d.act = Math.max(d.act, ring * intensity);
           }
         }
       }
@@ -264,9 +290,10 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
           const [i, j] = st.pairs[p];
           const a = st.dots[i], b = st.dots[j];
 
-          const k = Math.min(a.heat, b.heat);
+          const ka = a.heat + a.act, kb = b.heat + b.act;
+          const k = Math.min(ka, kb);
           if (k < 0.05) continue;
-          const op = Math.min(0.7, k * 0.9);
+          const op = Math.min(dark ? 0.55 : 0.4, k * (dark ? 0.66 : 0.5));
           ctx.strokeStyle = `rgba(${baseInk},${op})`;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
@@ -279,8 +306,8 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
             const d = st.dots[i];
             const ddx = d.x - mx, ddy = d.y - my;
             const dd2 = ddx * ddx + ddy * ddy;
-            if (dd2 > 70 * 70) continue;
-            const k = Math.exp(-dd2 / (2 * 45 * 45)) * intensity;
+            if (dd2 > 80 * 80) continue;
+            const k = Math.exp(-dd2 / (2 * 52 * 52)) * intensity;
             ctx.strokeStyle = `rgba(${baseInk},${Math.min(0.4, k * 0.4)})`;
             ctx.beginPath();
             ctx.moveTo(mx, my);
@@ -294,7 +321,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
         const d = st.dots[i];
 
         let wave = 0;
-        if (effect === 'ripple') {
+        if (effect === 'ripple' || effect === 'clickwave' || effect === 'ramp' || effect === 'bloom') {
           for (let j = 0; j < st.ripples.length; j++) {
             const r = st.ripples[j];
             const age = (now - r.t0) / 1000;
@@ -343,7 +370,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
         const ambient = 0.5 + 0.5 * Math.sin(ambT + d.phase);
 
         let baseR = 1.15 + 0.25 * ambient;
-        let baseOpacity = dark ? 0.22 : 0.18;
+        let baseOpacity = dark ? 0.22 : 0.26;
         let r = baseR;
         let opacity = baseOpacity + ambient * 0.04;
 
@@ -351,6 +378,23 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
           const k = Math.min(1.6, wave * intensity);
           r += k * 1.8 + prox * 1.2;
           opacity += k * 0.32 + prox * 0.22;
+        } else if (effect === 'clickwave') {
+          const k = Math.min(1.8, wave * intensity);
+          r += k * 2.0;
+          opacity += k * 0.42;
+        } else if (effect === 'bloom') {
+          const k = Math.min(2.0, wave * intensity);
+          r += k * 2.7;
+          opacity += k * 0.52;
+        } else if (effect === 'shrink') {
+          const s = prox * intensity;
+          r -= s * 0.85;
+          opacity += s * 0.08;
+        } else if (effect === 'ramp') {
+          const k = Math.min(1.6, wave * intensity);
+          const s = prox * intensity;
+          r += k * 1.9 - s * 0.8;
+          opacity += k * 0.34 + s * 0.05;
         } else if (effect === 'glow') {
           const g = prox * intensity;
           r += g * 2.6;
@@ -395,8 +439,8 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
           opacity += prox * 0.25;
         } else if (effect === 'synapse') {
 
-          r += d.heat * 1.7 + prox * 0.7;
-          opacity = Math.min(0.85, baseOpacity * 0.55 + d.heat * 0.5 + prox * 0.15);
+          r += d.heat * 0.8 + prox * 0.35 - d.act * 0.55;
+          opacity = Math.min(0.9, baseOpacity * 0.55 + (d.heat + d.act) * 0.5 + prox * 0.15);
         } else if (effect === 'swarm') {
 
           const swarming = d.x !== d.hx || d.y !== d.hy;
@@ -411,6 +455,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
         }
 
         opacity = Math.min(0.92, opacity);
+        r = Math.max(0.35, r);
 
         ctx.beginPath();
         ctx.fillStyle = `rgba(${baseInk},${opacity})`;
