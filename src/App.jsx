@@ -49,14 +49,6 @@ const EXPERIENCES = [
   dates: 'Summer 2024',
   bullets: [
   'Enhanced backend analytics infrastructure and improved NLP sentiment analysis for a React-based engagement dashboard.']
-},
-{
-  role: 'Software Engineer Intern',
-  company: 'DonorLab',
-  location: 'New York, NY',
-  dates: 'Summer 2023',
-  bullets: [
-  'Built an ETL pipeline consolidating donation records from multiple fundraising platforms into Snowflake.']
 }];
 
 const PROJECTS = [
@@ -68,21 +60,21 @@ const PROJECTS = [
   href: 'https://pokerlab.dev/'
 },
 {
-  name: 'Ledger Book',
+  name: 'LedgerCore',
   tag: 'Backend systems',
-  blurb: 'Double-entry payment ledger that records every transaction permanently and calculates balances from those records instead of storing them. Writes are idempotent, so retries and concurrent requests never create duplicates. Verified correctness with property-based testing across millions of random transaction sequences.',
-  stack: ['Go', 'PostgreSQL', 'React'],
-  href: '#'
+  blurb: 'Double-entry payment ledger that derives balances from an immutable record of every transaction, with overdraft protection so accounts can\'t go negative. Writes are idempotent, so retries and concurrent requests never create duplicates. Correctness is verified with property-based tests over random transaction sequences.',
+  stack: ['Go', 'PostgreSQL', 'Docker'],
+  href: 'https://ledgercore.dev/'
 },
 {
   name: 'DialGPT',
   tag: 'AI',
-  blurb: 'Phone-based voice assistant that connects a Twilio number to a GPT voice model for live spoken conversations. Streams audio in both directions in real time and detects interruptions within 300ms. Each call runs as an explicit state machine, so the whole call shuts down cleanly if either connection drops.',
+  blurb: 'Phone-based voice assistant that connects a Twilio number to a GPT voice model for live spoken conversations. Streams audio in both directions in real time and handles interruptions. Each call runs as an explicit state machine, so the whole call shuts down cleanly if either connection drops.',
   stack: ['Twilio', 'OpenAI', 'WebSockets'],
-  href: '#'
+  href: 'https://github.com/arunjo5/DialGPT'
 },
 {
-  name: 'Voice Retail Assistant',
+  name: 'Retail Assistant',
   tag: 'Embedded systems',
   blurb: 'Raspberry Pi based voice assistant that processes natural language queries and delivers inventory/store information for 200+ daily customers and staff in a local retail store. Used Datadog dashboards to track retries and error rates, achieving 99% uptime across daily use.',
   stack: ['Raspberry Pi', 'LangChain', 'Datadog'],
