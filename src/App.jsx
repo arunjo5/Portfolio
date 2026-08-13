@@ -1,30 +1,36 @@
 import React from 'react';
 import DotField from './DotField.jsx';
-import {
-  useTweaks, TweaksPanel, TweakSection,
-  TweakSlider, TweakToggle, TweakRadio, TweakSelect, TweakColor,
-} from './TweaksPanel.jsx';
 
-const TWEAK_DEFAULTS = {
-  "dark": true,
-  "dotDensity": 22,
-  "rippleIntensity": 1,
-  "accent": "sage",
-  "dotEffect": "synapse",
-  "dotColor": "#335f9a",
-  "nameFont": "mono",
-  "cursorStyle": "default",
-  "projectLayout": "grid"
-} ;
+const CONFIG = {
+  accent: 'sage',
+  nameFont: 'mono',
+  cursorStyle: 'default',
+  dotEffect: 'synapse',
+  dotColor: '#335f9a',
+  dotDensity: 22,
+  rippleIntensity: 1,
+  projectLayout: 'grid',
+};
+
+// Hero enhancements: 1 entrance · 2 idle firings · 16 scroll handoff · 32 micro-polish
+const HERO_FX = 1 | 2 | 16 | 32;
 
 const EXPERIENCES = [
+{
+  role: 'Software Engineer',
+  company: 'Handshake',
+  location: 'Remote',
+  dates: 'April 2026 — Present',
+  bullets: [
+  'Built agentic coding eval pipelines with reference solutions and reproducible environments around real open-source issues.']
+},
 {
   role: 'Software Engineer Intern',
   company: 'Florida Blue',
   location: 'Jacksonville, FL',
   dates: 'Summer 2026',
   bullets: [
-  'Optimized production Go microservices powering high-volume payment processing.']
+  'Improved the security and reliability of production payment microservices through vulnerability fixes, migration tests, and memory diagnostics.']
 },
 {
   role: 'Data Science Intern',
@@ -118,10 +124,44 @@ function Reveal({ children, delay = 0, as: As = 'div', className = '', ...rest }
 
 }
 
-function Hero({ dark, dotDensity, rippleIntensity, dotEffect, dotColor }) {
+function Hero({ dark }) {
+  const ref = React.useRef(null);
+  const [offscreen, setOffscreen] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.target.isConnected) return;
+      setOffscreen(!e.isIntersecting);
+    }, { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let raf = 0;
+    const tick = () => {
+      raf = 0;
+      const h = el.offsetHeight || 1;
+      const p = Math.min(1, Math.max(0, window.scrollY / h));
+      el.style.setProperty('--sy', p.toFixed(4));
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(tick); };
+    tick();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
-    <section className="hero" id="top">
-      <DotField density={dotDensity} intensity={rippleIntensity} dark={dark} effect={dotEffect} color={dotColor} />
+    <section ref={ref} className="hero enter handoff micro" id="top">
+      <DotField density={CONFIG.dotDensity} intensity={CONFIG.rippleIntensity} dark={dark}
+      effect={CONFIG.dotEffect} color={CONFIG.dotColor} fx={HERO_FX} paused={offscreen} />
       <div className="hero-inner">
         <h1 className="hero-title">
           <span>Arun</span>
@@ -134,7 +174,7 @@ function Hero({ dark, dotDensity, rippleIntensity, dotEffect, dotColor }) {
           <span className="meta-dot" />
           <span>B.S. Computer Science, 2027</span>
           <span className="meta-dot" />
-          <a href="#contact">Get in touch ↓</a>
+          <a href="#contact">Get in touch <span className="drift">↓</span></a>
         </div>
       </div>
     </section>);
@@ -156,7 +196,7 @@ function Experience() {
                   <span className="exp-sep"> · </span>
                   <span className="exp-co">{e.company}</span>
                 </h3>
-                <div className="exp-loc">{e.location}</div>
+                {e.location && <div className="exp-loc">{e.location}</div>}
               </div>
               {e.bullets.length > 0 &&
             <ul className="exp-bullets">
@@ -295,98 +335,33 @@ function Contact() {
 }
 
 function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [dark, setDark] = React.useState(() => {
+    try {
+      const v = localStorage.getItem('portfolio-theme');
+      if (v === 'light') return false;
+      if (v === 'dark') return true;
+    } catch (e) {/* ignore */}
+    return true;
+  });
 
   React.useEffect(() => {
-    document.documentElement.dataset.theme = t.dark ? 'dark' : 'light';
-    document.documentElement.dataset.accent = t.accent;
-    document.documentElement.dataset.nameFont = t.nameFont;
-    document.documentElement.dataset.cursor = t.cursorStyle;
-  }, [t.dark, t.accent, t.nameFont, t.cursorStyle]);
+    const r = document.documentElement;
+    r.dataset.theme = dark ? 'dark' : 'light';
+    r.dataset.accent = CONFIG.accent;
+    r.dataset.nameFont = CONFIG.nameFont;
+    r.dataset.cursor = CONFIG.cursorStyle;
+    try { localStorage.setItem('portfolio-theme', dark ? 'dark' : 'light'); } catch (e) {/* ignore */}
+  }, [dark]);
 
   return (
     <>
-      <Nav dark={t.dark} onToggleDark={() => setTweak('dark', !t.dark)} />
+      <Nav dark={dark} onToggleDark={() => setDark((d) => !d)} />
       <main>
-        <Hero dark={t.dark} dotDensity={t.dotDensity} rippleIntensity={t.rippleIntensity} dotEffect={t.dotEffect} dotColor={t.dotColor} />
+        <Hero dark={dark} />
         <Experience />
-        <Projects layout={t.projectLayout} />
+        <Projects layout={CONFIG.projectLayout} />
         <Contact />
       </main>
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="Name">
-          <TweakSelect label="Font" value={t.nameFont}
-          options={[
-          { value: 'editorial', label: 'Editorial — Geist + Newsreader' },
-          { value: 'sora', label: 'Sora — modern geometric' },
-          { value: 'manrope', label: 'Manrope — clean humanist' },
-          { value: 'dmsans', label: 'DM Sans — neutral modern' },
-          { value: 'jakarta', label: 'Plus Jakarta Sans' },
-          { value: 'albert', label: 'Albert Sans — sharp modern' },
-          { value: 'inter-tight', label: 'Inter Tight — tight grotesque' },
-          { value: 'lexend', label: 'Lexend — open + sleek' },
-          { value: 'funnel', label: 'Funnel Display — modern display' },
-          { value: 'syne', label: 'Syne — geometric display' },
-          { value: 'commissioner', label: 'Commissioner — editorial' },
-          { value: 'bricolage', label: 'Bricolage Grotesque' },
-          { value: 'onest', label: 'Onest' },
-          { value: 'outfit', label: 'Outfit' },
-          { value: 'unbounded', label: 'Unbounded — bold display' },
-          { value: 'schibsted', label: 'Schibsted Grotesk' },
-          { value: 'familjen', label: 'Familjen Grotesk' },
-          { value: 'serif', label: 'Instrument Serif' },
-          { value: 'dm-serif', label: 'DM Serif Display — editorial' },
-          { value: 'cormorant', label: 'Cormorant Garamond — elegant' },
-          { value: 'bodoni', label: 'Bodoni Moda — high-contrast' },
-          { value: 'crimson', label: 'Crimson Pro — book serif' },
-          { value: 'source-serif', label: 'Source Serif 4 — modern warm' },
-          { value: 'literata', label: 'Literata — reading serif' },
-          { value: 'spectral', label: 'Spectral — distinctive' },
-          { value: 'petrona', label: 'Petrona — variable warm' },
-          { value: 'marcellus', label: 'Marcellus — elegant Roman' },
-          { value: 'gloock', label: 'Gloock — high-contrast display' },
-          { value: 'warm', label: 'Fraunces' },
-          { value: 'mono', label: 'Geist Mono' },
-          { value: 'jbmono', label: 'JetBrains Mono' },
-          { value: 'plex-mono', label: 'IBM Plex Mono' },
-          { value: 'space-mono', label: 'Space Mono — retro tech' }]
-          }
-          onChange={(v) => setTweak('nameFont', v)} />
-        </TweakSection>
-        <TweakSection label="Hero dots">
-          <TweakSelect label="Cursor effect" value={t.dotEffect}
-          options={[
-          { value: 'ramp', label: 'Ramp — shrink + click ripple' },
-          { value: 'shrink', label: 'Shrink — smaller near cursor' },
-          { value: 'clickwave', label: 'Click ripple — outward on click' },
-          { value: 'bloom', label: 'Bloom — sonar burst on click' },
-          { value: 'ripple', label: 'Ripple — outward waves' },
-          { value: 'repel', label: 'Repel — push away' },
-          { value: 'attract', label: 'Attract — pull in' },
-          { value: 'glow', label: 'Glow — light up nearby' },
-          { value: 'trail', label: 'Trail — fading path' },
-          { value: 'constellation', label: 'Constellation — lines' },
-          { value: 'synapse', label: 'Original — synapse (lines)' },
-          { value: 'spotlight', label: 'Spotlight — reveal only nearby' },
-          { value: 'heatmap', label: 'Heatmap — persistent heat' },
-          { value: 'elastic', label: 'Elastic — springy mesh' },
-          { value: 'confetti', label: 'Confetti — click to burst' },
-          { value: 'zdepth', label: 'Z-depth — parallax float' },
-          { value: 'rings', label: 'Rings — sonar pulse' },
-          { value: 'swarm', label: 'Swarm — comet trail' }]
-          }
-          onChange={(v) => setTweak('dotEffect', v)} />
-          <TweakSlider label="Dot spacing" value={t.dotDensity}
-          min={14} max={72} step={1} unit="px"
-          onChange={(v) => setTweak('dotDensity', v)} />
-          <TweakSlider label="Intensity" value={t.rippleIntensity}
-          min={0.2} max={2.4} step={0.1}
-          onChange={(v) => setTweak('rippleIntensity', v)} />
-          <TweakColor label="Dot color" value={t.dotColor}
-          options={['#181c28', '#e8eaf0', '#335f9a', '#6b5ca8', '#3f8a6b', '#c0392b', '#e07b3c', '#a8523f', '#8a7a3f']}
-          onChange={(v) => setTweak('dotColor', v)} />
-        </TweakSection>
-      </TweaksPanel>
     </>);
 
 }

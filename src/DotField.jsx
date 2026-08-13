@@ -8,17 +8,22 @@ function hexToRgbStr(hex) {
   return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
 }
 
-function DotField({ density = 'regular', intensity = 1, dark = false, paused = false, effect = 'ripple', color = null }) {
+function DotField({ density = 'regular', intensity = 1, dark = false, paused = false, effect = 'ripple', color = null, fx = 0 }) {
   const canvasRef = React.useRef(null);
   const stateRef = React.useRef({
     dots: [],
     pairs: [],
+    adj: [],
     swarmIdx: [],
     ripples: [],
     particles: [],
     trail: [],
+    queue: [],
+    boxes: [],
+    smooth: { x: -9999, y: -9999 },
     mouse: { x: -9999, y: -9999, lastSpawn: 0, lastX: -9999, lastY: -9999 },
     w: 0, h: 0, dpr: 1, lastT: 0,
+    t0: 0, nextFire: 0, lastMeasure: -1e9, cx: 0, cy: 0, maxD: 1,
   });
 
   const spacing = typeof density === 'number'
@@ -61,6 +66,8 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
             phase: ((seed >> 16) & 0xff) / 255 * Math.PI * 2,
             heat: 0,
             act: 0,
+            rev: 1,
+            mask: 1,
           });
         }
       }
@@ -76,6 +83,18 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
         }
       }
       st.pairs = pairs;
+
+      const adj = [];
+      for (let i = 0; i < dots.length; i++) adj.push([]);
+      for (let p = 0; p < pairs.length; p++) {
+        const [i, j] = pairs[p];
+        adj[i].push(j);
+        adj[j].push(i);
+      }
+      st.adj = adj;
+      st.cx = rect.width / 2;
+      st.cy = rect.height / 2;
+      st.maxD = Math.max(1, Math.hypot(rect.width, rect.height) / 2);
 
       const swarmIdx = [];
       for (let i = 0; i < dots.length; i++) {
@@ -148,6 +167,64 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
     const TRAIL_MS = 700;
     const baseInk = color ? hexToRgbStr(color) : (dark ? '255,255,255' : '24,28,40');
 
+    const ENTRANCE = !!(fx & 1);
+    const IDLE = !!(fx & 2);
+    const INERTIA = !!(fx & 4);
+    const EXCLUDE = !!(fx & 8);
+    const MICRO = !!(fx & 32);
+    const ACT_NATIVE = effect === 'synapse' || effect === 'heatmap';
+    const REDUCE = MICRO && typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const smooth01 = (x) => {
+      const c = x < 0 ? 0 : x > 1 ? 1 : x;
+      return c * c * (3 - 2 * c);
+    };
+
+    const measureBoxes = () => {
+      const base = canvas.getBoundingClientRect();
+      const els = document.querySelectorAll('[data-hero-mask]');
+      const boxes = [];
+      for (let e = 0; e < els.length; e++) {
+        let rects = [];
+        try {
+          const rg = document.createRange();
+          rg.selectNodeContents(els[e]);
+          rects = Array.from(rg.getClientRects());
+        } catch (err) { rects = []; }
+        if (!rects.length) rects = [els[e].getBoundingClientRect()];
+        for (let i = 0; i < rects.length; i++) {
+          const r = rects[i];
+          if (r.width < 4 || r.height < 4) continue;
+          const inset = r.height * 0.16;
+          boxes.push({
+            x0: r.left - base.left - 5,
+            y0: r.top - base.top + inset,
+            x1: r.right - base.left + 5,
+            y1: r.bottom - base.top - inset,
+          });
+        }
+      }
+      st.boxes = boxes;
+    };
+
+    const maskAt = (x, y) => {
+      let best = 1;
+      for (let i = 0; i < st.boxes.length; i++) {
+        const b = st.boxes[i];
+        const dx = Math.max(b.x0 - x, 0, x - b.x1);
+        const dy = Math.max(b.y0 - y, 0, y - b.y1);
+        const m = smooth01(Math.sqrt(dx * dx + dy * dy) / 30);
+        if (m < best) best = m;
+      }
+      return best;
+    };
+
+    st.t0 = performance.now();
+    st.queue = [];
+    st.nextFire = st.t0 + 900;
+    st.lastMeasure = -1e9;
+
     const frame = (t) => {
       if (paused) { raf = requestAnimationFrame(frame); return; }
       const dt = st.lastT ? Math.min(50, t - st.lastT) / 1000 : 0.016;
@@ -156,18 +233,59 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
       ctx.clearRect(0, 0, w, h);
 
       const now = t;
+      const ep = ENTRANCE && !REDUCE ? smooth01((now - st.t0) / 1500) : 1;
+      if (EXCLUDE && now - st.lastMeasure > 120) { measureBoxes(); st.lastMeasure = now; }
+      if (IDLE && !REDUCE) {
+        if (now > st.nextFire && st.dots.length) {
+          st.nextFire = now + 1500 + Math.random() * 2400;
+          st.queue.push({ i: Math.floor(Math.random() * st.dots.length), at: now, amp: 0.9, hop: 0 });
+        }
+        if (st.queue.length) {
+          const keep = [];
+          for (let q = 0; q < st.queue.length; q++) {
+            const it = st.queue[q];
+            if (now < it.at) { keep.push(it); continue; }
+            const d = st.dots[it.i];
+            if (!d) continue;
+            d.act = Math.max(d.act, it.amp);
+            if (it.hop < 3) {
+              const nb = st.adj[it.i] || [];
+              for (let k = 0; k < nb.length; k++) {
+                if (Math.random() < 0.3) {
+                  keep.push({ i: nb[k], at: now + 95 + Math.random() * 90, amp: it.amp * 0.6, hop: it.hop + 1 });
+                }
+              }
+            }
+          }
+          st.queue = keep.length > 500 ? keep.slice(keep.length - 500) : keep;
+        }
+        if (!ACT_NATIVE) {
+          const ad = Math.exp(-3.4 * dt);
+          for (let i = 0; i < st.dots.length; i++) st.dots[i].act *= ad;
+        }
+      }
       st.ripples = st.ripples.filter((r) => now - r.t0 < LIFETIME);
       if (effect === 'trail') st.trail = st.trail.filter((s) => now - s.t < TRAIL_MS);
       if (effect === 'confetti') {
         st.particles = st.particles.filter((p) => now - p.t0 < p.life);
       }
 
-      const ambT = now / 1800;
+      const ambT = REDUCE ? 0 : now / 1800;
       const PROX_SIGMA = effect === 'glow' || effect === 'spotlight' ? 110 : 80;
       const FORCE_RADIUS = 140;
       const FORCE_MAX = 16;
-      const mx = st.mouse.x, my = st.mouse.y;
-      const mouseLive = mx > -1000;
+      let mx = st.mouse.x, my = st.mouse.y;
+      const mouseLive = !REDUCE && mx > -1000;
+      if (INERTIA) {
+        if (!mouseLive) { st.smooth.x = -9999; st.smooth.y = -9999; }
+        else {
+          if (st.smooth.x < -1000) { st.smooth.x = mx; st.smooth.y = my; }
+          const k = 1 - Math.exp(-7 * dt);
+          st.smooth.x += (mx - st.smooth.x) * k;
+          st.smooth.y += (my - st.smooth.y) * k;
+          mx = st.smooth.x; my = st.smooth.y;
+        }
+      }
 
       if (effect === 'elastic') {
         const K = 18;
@@ -247,6 +365,17 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
         }
       }
 
+      const revealing = ENTRANCE && ep < 1;
+      for (let i = 0; i < st.dots.length; i++) {
+        const d = st.dots[i];
+        if (revealing) {
+          const dnx = d.hx - st.cx, dny = d.hy - st.cy;
+          const dn = Math.sqrt(dnx * dnx + dny * dny) / st.maxD;
+          d.rev = smooth01((ep * 1.9 - dn * 0.9) / 0.5);
+        } else d.rev = 1;
+        d.mask = EXCLUDE ? maskAt(d.hx, d.hy) : 1;
+      }
+
       if (effect === 'constellation') {
         ctx.lineWidth = 0.6;
         for (let p = 0; p < st.pairs.length; p++) {
@@ -259,7 +388,8 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
             const cym = (a.y + b.y) * 0.5 - my;
             bias += Math.exp(-(cxm * cxm + cym * cym) / (2 * 130 * 130)) * 0.6 * intensity;
           }
-          const op = Math.min(0.5, bias * (dark ? 0.18 : 0.13));
+          const op = Math.min(0.5, bias * (dark ? 0.18 : 0.13)) *
+            Math.min(a.rev, b.rev) * Math.min(a.mask, b.mask);
           if (op < 0.015) continue;
           ctx.strokeStyle = `rgba(${baseInk},${op})`;
           ctx.beginPath();
@@ -274,7 +404,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
             const ddx = d.x - mx, ddy = d.y - my;
             const dd2 = ddx * ddx + ddy * ddy;
             if (dd2 > 95 * 95) continue;
-            const k = Math.exp(-dd2 / (2 * 55 * 55)) * intensity;
+            const k = Math.exp(-dd2 / (2 * 55 * 55)) * intensity * d.rev * d.mask;
             ctx.strokeStyle = `rgba(${baseInk},${Math.min(0.5, k * 0.55)})`;
             ctx.beginPath();
             ctx.moveTo(mx, my);
@@ -293,7 +423,9 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
           const ka = a.heat + a.act, kb = b.heat + b.act;
           const k = Math.min(ka, kb);
           if (k < 0.05) continue;
-          const op = Math.min(dark ? 0.55 : 0.4, k * (dark ? 0.66 : 0.5));
+          const op = Math.min(dark ? 0.55 : 0.4, k * (dark ? 0.66 : 0.5)) *
+            Math.min(a.rev, b.rev) * Math.min(a.mask, b.mask);
+          if (op < 0.012) continue;
           ctx.strokeStyle = `rgba(${baseInk},${op})`;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
@@ -307,7 +439,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
             const ddx = d.x - mx, ddy = d.y - my;
             const dd2 = ddx * ddx + ddy * ddy;
             if (dd2 > 80 * 80) continue;
-            const k = Math.exp(-dd2 / (2 * 52 * 52)) * intensity;
+            const k = Math.exp(-dd2 / (2 * 52 * 52)) * intensity * d.rev * d.mask;
             ctx.strokeStyle = `rgba(${baseInk},${Math.min(0.4, k * 0.4)})`;
             ctx.beginPath();
             ctx.moveTo(mx, my);
@@ -454,8 +586,9 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
           opacity += prox * 0.15;
         }
 
-        opacity = Math.min(0.92, opacity);
-        r = Math.max(0.35, r);
+        if (IDLE && !ACT_NATIVE) { r += d.act * 1.3; opacity += d.act * 0.4; }
+        opacity = Math.min(0.92, opacity) * d.rev * d.mask;
+        r = Math.max(0.35, r) * (0.5 + 0.5 * d.rev) * (0.55 + 0.45 * d.mask);
 
         ctx.beginPath();
         ctx.fillStyle = `rgba(${baseInk},${opacity})`;
@@ -491,7 +624,7 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
       window.removeEventListener('click', onClick);
       ro.disconnect();
     };
-  }, [spacing, intensity, dark, paused, effect, color]);
+  }, [spacing, intensity, dark, paused, effect, color, fx]);
 
   return (
     <canvas
@@ -501,5 +634,6 @@ function DotField({ density = 'regular', intensity = 1, dark = false, paused = f
     />
   );
 }
+
 
 export default DotField;
