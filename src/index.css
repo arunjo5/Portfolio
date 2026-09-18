@@ -411,12 +411,19 @@ html[data-name-font="gloock"]       .hero-title { letter-spacing: -0.025em; font
   display: grid;
   grid-template-columns: 160px 1fr;
   gap: 32px;
-  padding: 28px 0;
+  padding: 28px 16px;
   border-top: 0.5px solid var(--rule);
-  transition: background .2s ease;
+  position: relative;
+  isolation: isolate;
 }
 .exp-row:last-child { border-bottom: 0.5px solid var(--rule); }
-.exp-row:hover { background: color-mix(in oklab, var(--fg) 2.5%, transparent); }
+.exp-row::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: color-mix(in oklab, var(--fg) 2.5%, transparent);
+  opacity: 0; transition: opacity .2s ease;
+  pointer-events: none;
+}
+.exp-row:hover::before { opacity: 1; }
 .exp-dates {
   font-family: 'Geist Mono', ui-monospace, monospace;
   font-size: 12px; letter-spacing: 0.02em;
@@ -462,7 +469,7 @@ html[data-name-font="gloock"]       .hero-title { letter-spacing: -0.025em; font
   background: var(--card);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   min-height: 220px;
-  transition: transform .3s cubic-bezier(.2,.7,.3,1), border-color .3s ease, background .3s ease;
+  transition: opacity .7s ease, transform .3s cubic-bezier(.2,.7,.3,1), border-color .3s ease, background .3s ease;
 }
 .proj-card:hover {
   transform: translateY(-3px);

@@ -20,7 +20,7 @@ const EXPERIENCES = [
   role: 'Software Engineer',
   company: 'Handshake',
   location: 'Remote',
-  dates: 'April 2026 — Present',
+  dates: 'March 2026 — Present',
   bullets: [
   'Built agentic coding eval pipelines with reference solutions and reproducible environments around real open-source issues.']
 },
@@ -38,7 +38,7 @@ const EXPERIENCES = [
   location: 'West Lafayette, IN',
   dates: 'Jan 2026 — May 2026',
   bullets: [
-  'Deployed a high-throughput computer vision pipeline for license plate recognition in live traffic environments.']
+  'Deployed a CUDA-accelerated computer vision pipeline for license plate recognition in live traffic environments.']
 },
 {
   role: 'Software Developer',
@@ -47,22 +47,14 @@ const EXPERIENCES = [
   dates: 'Dec 2024 — Dec 2025',
   bullets: [
   'Developed real-time, fault-tolerant flight software for autonomous spacecraft guidance, navigation, and control systems.']
-},
-{
-  role: 'Software Engineer Intern',
-  company: 'Perceptify',
-  location: 'Boulder, CO',
-  dates: 'Summer 2024',
-  bullets: [
-  'Enhanced backend analytics infrastructure and improved NLP sentiment analysis for a React-based engagement dashboard.']
 }];
 
 const PROJECTS = [
 {
   name: 'PokerLab',
   tag: 'Full-stack',
-  blurb: "Poker analytics platform for equity calculation, pot-odds analysis, and hand-history replay. Optimized the naive simulation runtime by 10x by using worker threads and batched Monte Carlo, running up to 1M simulations per hand. Enforced rate limiting with Redis so per-user limits hold across stateless serverless instances.",
-  stack: ['Node.js', 'PostgreSQL', 'Redis'],
+  blurb: "Poker analytics platform that includes equity calculation, pot-odds analysis, and hand-history replay. Monte Carlo simulations efficiently run up to 1M trials per hand using batching, worker threads, and bitmask card encoding. A heads-up river solver uses counterfactual regret minimization (CFR) to calculate optimal strategy.",
+  stack: ['Node.js', 'PostgreSQL', 'Stripe'],
   href: 'https://pokerlab.dev/'
 },
 {
@@ -73,18 +65,18 @@ const PROJECTS = [
   href: 'https://ledgercore.dev/'
 },
 {
-  name: 'DialGPT',
-  tag: 'AI',
-  blurb: 'Phone-based voice assistant that connects a Twilio number to a GPT voice model for live spoken conversations. Streams audio in both directions in real time and handles interruptions. Each call runs as an explicit state machine, so the whole call shuts down cleanly if either connection drops.',
-  stack: ['Twilio', 'OpenAI', 'WebSockets'],
-  href: 'https://github.com/arunjo5/DialGPT'
+  name: 'KernelLens',
+  tag: 'Systems engineering',
+  blurb: 'Linux observability tool for finding CPU and disk bottlenecks in running services. It tracks scheduling delays and disk I/O latency in real time. Results are summarized with percentile timings and exported to Prometheus for monitoring over time. The tracer stays lightweight under load, with measured throughput loss below 2%.',
+  stack: ['C/C++', 'eBPF', 'Prometheus'],
+  href: 'https://github.com/arunjo5/KernelLens'
 },
 {
-  name: 'Retail Assistant',
-  tag: 'Embedded systems',
-  blurb: 'Raspberry Pi based voice assistant that processes natural language queries and delivers inventory/store information for 200+ daily customers and staff in a local retail store. Used Datadog dashboards to track retries and error rates, achieving 99% uptime across daily use.',
-  stack: ['Raspberry Pi', 'LangChain', 'Datadog'],
-  href: '#'
+  name: 'DialGPT',
+  tag: 'AI',
+  blurb: 'Phone-based voice assistant that connects a Twilio number to a GPT voice model for live spoken conversations. It streams audio in both directions in real time and handles interruptions. It can also answer questions from a PDF using embedding search. Each call runs as an explicit state machine, so the whole call shuts down cleanly if either connection drops.',
+  stack: ['Twilio', 'OpenAI', 'WebSockets'],
+  href: 'https://github.com/arunjo5/DialGPT'
 }];
 
 function SectionLabel({ children, num }) {
